@@ -1,0 +1,4 @@
+lask
+Flask-Cors
+requests
+gunicorn
