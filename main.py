@@ -5,9 +5,8 @@ import requests
 import csv
 from io import StringIO
 import json
-import re # Importamos la librería de expresiones regulares para buscar números
+import re
 
-# Crear el servidor web
 app = Flask(__name__)
 CORS(app, resources={r"/webhook/*": {"origins": "*"}})
 
@@ -25,13 +24,11 @@ def extraer_datos_pedido(mensaje):
     }
     mensaje_lower = mensaje.lower()
     
-    # 1. Extraer medidas (ej: 4x5, 2.5x3, etc.)
     medidas_match = re.search(r'(\d+\.?\d*)\s*x\s*(\d+\.?\d*)', mensaje_lower)
     if medidas_match:
         datos["ancho"] = float(medidas_match.group(1))
         datos["alto"] = float(medidas_match.group(2))
 
-    # 2. Extraer cantidad (ej: 100 stikers, 50 und, etc.)
     todos_los_numeros = re.findall(r'\d+\.?\d*', mensaje_lower)
     numeros_de_medidas_str = [medidas_match.group(1), medidas_match.group(2)] if medidas_match else []
     
@@ -40,7 +37,6 @@ def extraer_datos_pedido(mensaje):
             datos["cantidad"] = int(float(num_str))
             break
 
-    # 3. Extraer términos de búsqueda
     palabras = re.sub(r'[\d.x,]', '', mensaje_lower).split()
     datos["terminos_busqueda"] = [p for p in palabras if len(p) > 2]
 
@@ -100,5 +96,4 @@ def home():
     return "Servidor de cálculo activo."
 
 if __name__ == "__main__":
-    # Gunicorn se encargará del puerto, esta parte es para pruebas locales
-    app.run(host='0.0.0.0', port=8080)
+    app.run()
