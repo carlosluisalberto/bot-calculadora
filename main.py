@@ -11,7 +11,7 @@ app = Flask(__name__)
 CORS(app, resources={r"/webhook/*": {"origins": "*"}})
 
 # --- CONFIGURACIÓN ---
-# PEGA TU ENLACE CSV DE "PUBLICAR EN LA WEB" AQUÍ DENTRO DE LAS COMILLAS
+# ¡PEGA TU ENLACE CSV DE "PUBLICAR EN LA WEB" AQUÍ!
 URL_GOOGLE_SHEET_CSV = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRDiJdEibznvruFGgZ--qa6LMr3bvgUZLDuo4Ov4KusFStdSo8K0sxk03gsiRwNUGwfoPa39bL3MI-u/pub?output=csv"
 
 # --- LÓGICA DE EXTRACCIÓN DE DATOS ---
