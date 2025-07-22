@@ -12,7 +12,7 @@ CORS(app, resources={r"/webhook/*": {"origins": "*"}})
 
 # --- CONFIGURACIÓN ---
 # PEGA TU ENLACE CSV DE "PUBLICAR EN LA WEB" AQUÍ DENTRO DE LAS COMILLAS
-URL_GOOGLE_SHEET_CSV = "PEGA_TU_ENLACE_CSV_AQUI"
+URL_GOOGLE_SHEET_CSV = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRDiJdEibznvruFGgZ--qa6LMr3bvgUZLDuo4Ov4KusFStdSo8K0sxk03gsiRwNUGwfoPa39bL3MI-u/pub?output=csv"
 
 # --- LÓGICA DE EXTRACCIÓN DE DATOS ---
 def extraer_datos_pedido(mensaje):
