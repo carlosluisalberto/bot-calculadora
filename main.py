@@ -11,11 +11,17 @@ app = Flask(__name__)
 CORS(app, resources={r"/webhook/*": {"origins": "*"}})
 
 # --- CONFIGURACIÓN ---
+# ¡ASEGÚRATE DE QUE ESTA SEA TU URL CORRECTA DE GOOGLE SHEETS!
 URL_GOOGLE_SHEET_CSV = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRDiJdEibznvruFGgZ--qa6LMr3bvgUZLDuo4Ov4KusFStdSo8K0sxk03gsiRwNUGwfoPa39bL3MI-u/pub?output=csv"
 
 # --- LÓGICA DE EXTRACCIÓN DE DATOS ---
 def extraer_datos_pedido(mensaje):
-    datos = {"cantidad": None, "ancho": None, "alto": None, "terminos_busqueda": []}
+    datos = {
+        "cantidad": None,
+        "ancho": None,
+        "alto": None,
+        "terminos_busqueda": []
+    }
     mensaje_lower = mensaje.lower()
     
     medidas_match = re.search(r'(\d+\.?\d*)\s*x\s*(\d+\.?\d*)', mensaje_lower)
@@ -33,29 +39,27 @@ def extraer_datos_pedido(mensaje):
 
     palabras = re.sub(r'[\d.x,]', '', mensaje_lower).split()
     datos["terminos_busqueda"] = [p for p in palabras if len(p) > 2]
+
     return datos
 
 # --- CÓDIGO DEL SERVIDOR ---
-def buscar_producto(terminos_busqueda, productos_csv):
-    for fila in productos_csv:
-        nombre_producto = fila.get('Nombre_Producto', '').lower()
-        if not terminos_busqueda: continue
-        if all(term.lower() in nombre_producto for term in terminos_busqueda):
-            return fila
-    return None
+def buscar_producto(terminos_busqueda):
+    try:
+        respuesta = requests.get(URL_GOOGLE_SHEET_CSV)
+        respuesta.raise_for_status()
+        datos_csv = StringIO(respuesta.text)
+        lector = csv.DictReader(datos_csv)
+        for fila in lector:
+            nombre_producto = fila.get('Nombre_Producto', '').lower()
+            if all(term.lower() in nombre_producto for term in terminos_busqueda):
+                return fila
+        return None
+    except Exception as e:
+        print(f"Error buscando producto: {e}")
+        return None
 
 @app.route('/webhook', methods=['POST'])
 def handle_webhook():
-    try:
-        respuesta_csv = requests.get(URL_GOOGLE_SHEET_CSV)
-        respuesta_csv.raise_for_status()
-        datos_csv_texto = respuesta_csv.text
-    except Exception as e:
-        print(f"Error fatal: No se pudo descargar Google Sheet. {e}")
-        return jsonify({"respuesta": "Error: No se pudo conectar con la base de datos de precios."})
-
-    lector_csv = list(csv.DictReader(StringIO(datos_csv_texto)))
-    
     datos_cliente = request.get_json()
     if not datos_cliente or 'text' not in datos_cliente:
         return jsonify({"error": "Petición inválida."}), 400
@@ -68,37 +72,28 @@ def handle_webhook():
     alto = datos_extraidos["alto"]
     terminos_busqueda = datos_extraidos["terminos_busqueda"]
 
-    producto = buscar_producto(terminos_busqueda, lector_csv)
+    producto = buscar_producto(terminos_busqueda)
 
     if not producto:
         return jsonify({"respuesta": "Lo siento, no pude identificar el producto en tu pedido. Por favor, sé más específico."})
 
-    tipo_calculo = producto.get('Tipo_Calculo', '')
+    if not all([cantidad, ancho, alto]):
+        return jsonify({"respuesta": f"Para cotizar '{producto['Nombre_Producto']}', por favor indica la cantidad y las medidas (ej: 100 unidades de 4x5 pulgadas)."})
+
     v_valor = float(producto.get('V_Valor', 0))
     m_minimo = float(producto.get('M_Minimo', 0))
-    respuesta_formateada = ""
-
-    if tipo_calculo == 'Area':
-        if not all([cantidad, ancho, alto]):
-            return jsonify({"respuesta": f"Para cotizar '{producto['Nombre_Producto']}', por favor indica la cantidad y las medidas (ej: 100 unidades de 4x5 pulgadas)."})
-        precio_base = (cantidad * ancho * alto / 144) * v_valor
-        precio_final = max(m_minimo, precio_base)
-        respuesta_formateada = f"{producto['Nombre_Producto']}\n{cantidad} unidades de {ancho}x{alto} pulgadas\nPrecio: ${precio_final:,.2f}"
     
-    elif tipo_calculo == 'Unidad':
-        if not cantidad:
-            return jsonify({"respuesta": f"Para cotizar '{producto['Nombre_Producto']}', por favor indica la cantidad (ej: 5 yardas)."})
-        precio_base = cantidad * v_valor
-        precio_final = max(m_minimo, precio_base)
-        unidad_nombre = "yarda" if "yarda" in mensaje_cliente.lower() else "unidad"
-        plural = "s" if cantidad > 1 else ""
-        respuesta_formateada = f"{producto['Nombre_Producto']}\n{cantidad} {unidad_nombre}{plural}\nPrecio: ${precio_final:,.2f}"
-
-    else:
-        return jsonify({"respuesta": "Error: El producto no tiene un tipo de cálculo definido."})
+    precio_base = (cantidad * ancho * alto / 144) * v_valor
+    precio_final = max(m_minimo, precio_base)
+    
+    respuesta_formateada = f"{producto['Nombre_Producto']}\n{cantidad} unidades de {ancho}x{alto} pulgadas\nPrecio: ${precio_final:,.2f}"
     
     return jsonify({"respuesta": respuesta_formateada})
 
+# Ruta para verificar que el servidor está vivo
 @app.route('/')
 def home():
     return "Servidor de cálculo activo."
+
+if __name__ == "__main__":
+    app.run()
