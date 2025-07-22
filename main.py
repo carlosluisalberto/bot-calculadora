@@ -11,14 +11,13 @@ app = Flask(__name__)
 CORS(app, resources={r"/webhook/*": {"origins": "*"}})
 
 # --- CONFIGURACIÓN ---
-# ¡PEGA TU ENLACE CSV DE "PUBLICAR EN LA WEB" AQUÍ!
 URL_GOOGLE_SHEET_CSV = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRDiJdEibznvruFGgZ--qa6LMr3bvgUZLDuo4Ov4KusFStdSo8K0sxk03gsiRwNUGwfoPa39bL3MI-u/pub?output=csv"
 
 # --- LÓGICA DE EXTRACCIÓN DE DATOS ---
 def extraer_datos_pedido(mensaje):
     datos = {"cantidad": None, "ancho": None, "alto": None, "terminos_busqueda": []}
     mensaje_lower = mensaje.lower()
-
+    
     medidas_match = re.search(r'(\d+\.?\d*)\s*x\s*(\d+\.?\d*)', mensaje_lower)
     if medidas_match:
         datos["ancho"] = float(medidas_match.group(1))
@@ -26,7 +25,7 @@ def extraer_datos_pedido(mensaje):
 
     todos_los_numeros = re.findall(r'\d+\.?\d*', mensaje_lower)
     numeros_de_medidas_str = [medidas_match.group(1), medidas_match.group(2)] if medidas_match else []
-
+    
     for num_str in todos_los_numeros:
         if num_str not in numeros_de_medidas_str:
             datos["cantidad"] = int(float(num_str))
@@ -61,7 +60,7 @@ def handle_webhook():
 
     mensaje_cliente = datos_cliente.get('text', '')
     datos_extraidos = extraer_datos_pedido(mensaje_cliente)
-
+    
     cantidad = datos_extraidos["cantidad"]
     ancho = datos_extraidos["ancho"]
     alto = datos_extraidos["alto"]
@@ -77,12 +76,12 @@ def handle_webhook():
 
     v_valor = float(producto.get('V_Valor', 0))
     m_minimo = float(producto.get('M_Minimo', 0))
-
+    
     precio_base = (cantidad * ancho * alto / 144) * v_valor
     precio_final = max(m_minimo, precio_base)
-
+    
     respuesta_formateada = f"{producto['Nombre_Producto']}\n{cantidad} unidades de {ancho}x{alto} pulgadas\nPrecio: ${precio_final:,.2f}"
-
+    
     return jsonify({"respuesta": respuesta_formateada})
 
 @app.route('/')
