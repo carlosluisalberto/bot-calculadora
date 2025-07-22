@@ -5,24 +5,33 @@ import requests
 import csv
 from io import StringIO
 import json
-import re
+import re # Importamos la librería de expresiones regulares para buscar números
 
+# Crear el servidor web
 app = Flask(__name__)
 CORS(app, resources={r"/webhook/*": {"origins": "*"}})
 
 # --- CONFIGURACIÓN ---
+# ¡ASEGÚRATE DE QUE ESTA SEA TU URL CORRECTA DE GOOGLE SHEETS!
 URL_GOOGLE_SHEET_CSV = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRDiJdEibznvruFGgZ--qa6LMr3bvgUZLDuo4Ov4KusFStdSo8K0sxk03gsiRwNUGwfoPa39bL3MI-u/pub?output=csv"
 
 # --- LÓGICA DE EXTRACCIÓN DE DATOS ---
 def extraer_datos_pedido(mensaje):
-    datos = {"cantidad": None, "ancho": None, "alto": None, "terminos_busqueda": []}
+    datos = {
+        "cantidad": None,
+        "ancho": None,
+        "alto": None,
+        "terminos_busqueda": []
+    }
     mensaje_lower = mensaje.lower()
     
+    # 1. Extraer medidas (ej: 4x5, 2.5x3, etc.)
     medidas_match = re.search(r'(\d+\.?\d*)\s*x\s*(\d+\.?\d*)', mensaje_lower)
     if medidas_match:
         datos["ancho"] = float(medidas_match.group(1))
         datos["alto"] = float(medidas_match.group(2))
 
+    # 2. Extraer cantidad (ej: 100 stikers, 50 und, etc.)
     todos_los_numeros = re.findall(r'\d+\.?\d*', mensaje_lower)
     numeros_de_medidas_str = [medidas_match.group(1), medidas_match.group(2)] if medidas_match else []
     
@@ -31,8 +40,10 @@ def extraer_datos_pedido(mensaje):
             datos["cantidad"] = int(float(num_str))
             break
 
+    # 3. Extraer términos de búsqueda
     palabras = re.sub(r'[\d.x,]', '', mensaje_lower).split()
     datos["terminos_busqueda"] = [p for p in palabras if len(p) > 2]
+
     return datos
 
 # --- CÓDIGO DEL SERVIDOR ---
@@ -44,7 +55,6 @@ def buscar_producto(terminos_busqueda):
         lector = csv.DictReader(datos_csv)
         for fila in lector:
             nombre_producto = fila.get('Nombre_Producto', '').lower()
-            if not terminos_busqueda: continue
             if all(term.lower() in nombre_producto for term in terminos_busqueda):
                 return fila
         return None
@@ -84,9 +94,11 @@ def handle_webhook():
     
     return jsonify({"respuesta": respuesta_formateada})
 
+# Ruta para verificar que el servidor está vivo
 @app.route('/')
 def home():
     return "Servidor de cálculo activo."
 
 if __name__ == "__main__":
-    app.run()
+    # Gunicorn se encargará del puerto, esta parte es para pruebas locales
+    app.run(host='0.0.0.0', port=8080)
